@@ -1,10 +1,3 @@
-# src/domain/strategies.py
-
-"""
-Este módulo define um contrato (GameStrategy) e implementações concretas.
-É aqui que a mágica da diversidade acontece.
-"""
-
 import random
 from abc import ABC, abstractmethod
 from typing import List
@@ -22,31 +15,149 @@ class GameStrategy(ABC):
 
 
 class EmojiStrategy(GameStrategy):
-    """Modo Clássico: O par é idêntico (Emoji A com Emoji A)."""
+    """
+    Estratégia baseada em bancos de emojis.
+    Seleciona aleatoriamente um subconjunto do banco total.
+    """
 
-    # Banco de dados de emojis expandido
+    # Banco de Dados Expandido
     THEMES = {
-        "Animais": ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯"],
-        "Frutas": ["🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍍"],
-        "Espaço": ["🚀", "⭐", "🌙", "🌎", "☀️", "☄️", "👽", "📡", "🛰️", "🛸"],
+        "Animais": [
+            "🐶",
+            "🐱",
+            "🐭",
+            "🐹",
+            "🐰",
+            "🦊",
+            "🐻",
+            "🐼",
+            "🐨",
+            "🐯",
+            "🦁",
+            "🐮",
+            "🐷",
+            "🐸",
+            "🐵",
+            "🐔",
+            "🐧",
+            "🐦",
+            "🐤",
+            "🦆",
+            "🦅",
+            "🦉",
+            "🦇",
+            "🐺",
+            "🐗",
+            "🐴",
+            "🦄",
+            "🐝",
+            "🐛",
+            "🦋",
+            "🐌",
+            "🐞",
+            "🐜",
+            "🦗",
+            "🕷",
+            "🦂",
+            "🐢",
+            "🐍",
+            "🦎",
+            "🦖",
+            "🐙",
+            "🦑",
+            "🦐",
+            "🦞",
+            "🦀",
+            "🐡",
+            "🐠",
+            "🐟",
+            "🐬",
+            "🐳",
+        ],
+        "Espaço": [
+            "🚀",
+            "🛸",
+            "🌍",
+            "🌕",
+            "⭐",
+            "☄️",
+            "👾",
+            "👨‍🚀",
+            "🔭",
+            "🌌",
+            "☀️",
+            "🪐",
+            "🌑",
+            "🛰️",
+            "👽",
+            "🌠",
+            "🌤️",
+            "⛈️",
+            "⛄",
+            "🔥",
+            "🧨",
+            "✨",
+            "🎈",
+            "🎉",
+            "✈️",
+            "🛩️",
+            "🚁",
+            "🚠",
+            "🏔️",
+            "🌋",
+        ],
+        "Bandeiras": [
+            "🇧🇷",
+            "🇺🇸",
+            "🇨🇦",
+            "🇯🇵",
+            "🇰🇷",
+            "🇨🇳",
+            "🇩🇪",
+            "🇫🇷",
+            "🇮🇹",
+            "🇪🇸",
+            "🇬🇧",
+            "🇦🇺",
+            "🇦🇷",
+            "🇨🇱",
+            "🇨🇴",
+            "🇲🇽",
+            "🇵🇹",
+            "🇷🇺",
+            "🇮🇳",
+            "🇿🇦",
+            "🇨🇭",
+            "🇸🇪",
+            "🇳🇴",
+            "🇫🇮",
+            "🇩🇰",
+            "🇳🇱",
+            "🇧🇪",
+            "🇬🇷",
+            "🇹🇷",
+            "🇪🇬",
+        ],
     }
 
     def __init__(self, theme: str = "Animais"):
         if theme not in self.THEMES:
-            raise ValueError(f"Tema desconhecido. Opções: {list(self.THEMES.keys())}")
+            # Fallback seguro
+            theme = "Animais"
         self.theme_items = self.THEMES[theme]
 
     def generate_cards(self, num_pairs: int) -> List[Card]:
+        # Validação robusta
         if num_pairs > len(self.theme_items):
             raise ValueError(
-                f"O tema '{self.theme_items}' não tem itens suficientes para {num_pairs} pares."
+                f"O tema precisa de {num_pairs} itens, mas só tem {len(self.theme_items)}. Adicione mais emojis!"
             )
 
+        # Sorteia itens aleatórios do banco grande
         selected = random.sample(self.theme_items, num_pairs)
         cards = []
 
         for item in selected:
-            # No modo simples, match_id e display são iguais
             cards.append(Card(match_id=item, display_content=item))
             cards.append(Card(match_id=item, display_content=item))
 
@@ -55,61 +166,99 @@ class EmojiStrategy(GameStrategy):
 
 
 class MathStrategy(GameStrategy):
-    """Modo Matemático: O par é Operação + Resultado (5+5 com 10)."""
+    """
+    Estratégia Algorítmica: Gera contas na hora.
+    Nunca fica sem itens!
+    """
 
     def generate_cards(self, num_pairs: int) -> List[Card]:
         cards = []
-        for _ in range(num_pairs):
-            # Gera soma simples para começar (pode evoluir para subtração/multiplicação)
-            a = random.randint(1, 10)
-            b = random.randint(1, 10)
-            result = str(a + b)
-            expression = f"{a} + {b}"
+        # Gera operações únicas
+        operations_set = set()
 
-            # Carta 1: A expressão (match_id é o resultado)
-            cards.append(Card(match_id=result, display_content=expression))
-            # Carta 2: O resultado numérico
-            cards.append(Card(match_id=result, display_content=result))
+        while len(operations_set) < num_pairs:
+            a = random.randint(1, 20)
+            b = random.randint(1, 20)
+            # Evita duplicatas (ex: 2+2 e depois outro 2+2)
+            op_id = f"{a}+{b}"
+            if op_id not in operations_set:
+                operations_set.add(op_id)
+
+                result = str(a + b)
+                expression = f"{a} + {b}"
+
+                # Match ID é o resultado. Display é diferente.
+                cards.append(Card(match_id=result, display_content=expression))
+                cards.append(Card(match_id=result, display_content=result))
 
         random.shuffle(cards)
         return cards
 
 
 class ChemistryStrategy(GameStrategy):
-    """Modo Educativo: Símbolo Químico <-> Nome do Elemento"""
+    """Base de Dados Expandida de Química."""
 
     ELEMENTS = [
         ("H", "Hidrogênio"),
         ("He", "Hélio"),
         ("Li", "Lítio"),
-        ("O", "Oxigênio"),
+        ("Be", "Berílio"),
+        ("B", "Boro"),
         ("C", "Carbono"),
-        ("Au", "Ouro"),
-        ("Ag", "Prata"),
-        ("Fe", "Ferro"),
+        ("N", "Nitrogênio"),
+        ("O", "Oxigênio"),
+        ("F", "Flúor"),
+        ("Ne", "Neônio"),
         ("Na", "Sódio"),
+        ("Mg", "Magnésio"),
+        ("Al", "Alumínio"),
+        ("Si", "Silício"),
+        ("P", "Fósforo"),
+        ("S", "Enxofre"),
         ("Cl", "Cloro"),
         ("K", "Potássio"),
         ("Ca", "Cálcio"),
-        ("N", "Nitrogênio"),
+        ("Sc", "Escândio"),
+        ("Ti", "Titânio"),
+        ("V", "Vanádio"),
+        ("Cr", "Cromo"),
+        ("Mn", "Manganês"),
+        ("Fe", "Ferro"),
+        ("Co", "Cobalto"),
+        ("Ni", "Níquel"),
         ("Cu", "Cobre"),
-        ("Pb", "Chumbo"),
-        ("U", "Urânio"),
-        ("Sn", "Estanho"),
+        ("Zn", "Zinco"),
+        ("Ga", "Gálio"),
+        ("Ge", "Germânio"),
+        ("As", "Arsênio"),
+        ("Se", "Selênio"),
+        ("Br", "Bromo"),
+        ("Kr", "Criptônio"),
+        ("Rb", "Rubídio"),
+        ("Sr", "Estrôncio"),
+        ("Y", "Ítrio"),
+        ("Zr", "Zircônio"),
+        ("Nb", "Nióbio"),
+        ("Ag", "Prata"),
+        ("Au", "Ouro"),
         ("Hg", "Mercúrio"),
+        ("Pb", "Chumbo"),
+        ("Sn", "Estanho"),
+        ("U", "Urânio"),
+        ("Pt", "Platina"),
+        ("I", "Iodo"),
     ]
 
     def generate_cards(self, num_pairs: int) -> List[Card]:
         if num_pairs > len(self.ELEMENTS):
-            # Fallback ou erro se pedir mais elementos do que temos
-            raise ValueError("Não há elementos suficientes.")
+            raise ValueError("Adicione mais elementos químicos na lista!")
 
         selected = random.sample(self.ELEMENTS, num_pairs)
         cards = []
         for symbol, name in selected:
-            # Ambos compartilham o ID 'symbol' (ex: 'Au'), mas mostram textos diferentes
-            cards.append(Card(match_id=symbol, display_content=symbol))  # Carta Au
-            cards.append(Card(match_id=symbol, display_content=name))  # Carta Ouro
+            # ID único é o símbolo
+            cards.append(Card(match_id=symbol, display_content=symbol))
+            cards.append(Card(match_id=symbol, display_content=name))
 
         random.shuffle(cards)
         return cards

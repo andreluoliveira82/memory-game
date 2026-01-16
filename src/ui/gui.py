@@ -5,19 +5,21 @@ from src.ui.styles import COLORS, DIMENSIONS
 
 
 class GraphicUI:
-    def __init__(self, service: GameService):
+    # Adicione card_size como argumento opcional
+    def __init__(self, service: GameService, card_size: int = None):
         self.service = service
         self.screen = pygame.display.get_surface()
 
-        # Recalcula dimensões
+        # Se não passar tamanho, usa o padrão do styles.py
+        self.card_size = card_size if card_size else DIMENSIONS["card_size"]
+
         self.width = self.screen.get_width()
         self.height = self.screen.get_height()
 
-        # Grid dimensions
-        self.grid_width = (service.board.cols * DIMENSIONS["card_size"]) + (
+        # --- USA self.card_size AGORA ---
+        self.grid_width = (service.board.cols * self.card_size) + (
             (service.board.cols - 1) * DIMENSIONS["gap"]
         )
-
         # Fontes
         try:
             # Fonte Emoji (Segoe UI Emoji no Windows)
@@ -27,7 +29,7 @@ class GraphicUI:
                 "consolas", 22
             )  # Fonte monoespaçada para números
             self.font_msg = pygame.font.SysFont("segoeui", 28)
-        except:
+        except Exception:
             self.font_base_name = "arial"
             self.font_title = pygame.font.SysFont("arial", 40, bold=True)
             self.font_stats = pygame.font.SysFont("arial", 20)
@@ -39,6 +41,7 @@ class GraphicUI:
         self.waiting_to_hide = False
         self.hide_timestamp = 0
         self.cards_to_hide = None
+        self.saved = False
 
     def update(self):
         # Lógica de delay ao errar
@@ -123,7 +126,7 @@ class GraphicUI:
 
         # --- 3. RODAPÉ ---
         msg_surf = self.font_msg.render(self.message, True, COLORS["accent"])
-        msg_rect = msg_surf.get_rect(center=(self.width // 2, self.height - 30))
+        msg_rect = msg_surf.get_rect(center=(self.width // 2, self.height - 50))
         self.screen.blit(msg_surf, msg_rect)
 
     def _draw_stat_box(self, text, center_pos, color=COLORS["text"]):
@@ -133,13 +136,15 @@ class GraphicUI:
         self.screen.blit(surf, rect)
 
     def _get_card_rect(self, row, col):
-        # Centralização precisa
         start_x = (self.width - self.grid_width) // 2
-        start_y = DIMENSIONS["header_height"]  # Usa a margem definida no style
+        start_y = DIMENSIONS["header_height"]
 
-        x = start_x + col * (DIMENSIONS["card_size"] + DIMENSIONS["gap"])
-        y = start_y + row * (DIMENSIONS["card_size"] + DIMENSIONS["gap"])
-        return pygame.Rect(x, y, DIMENSIONS["card_size"], DIMENSIONS["card_size"])
+        # --- USA self.card_size AQUI TAMBÉM ---
+        x = start_x + col * (self.card_size + DIMENSIONS["gap"])
+        y = start_y + row * (self.card_size + DIMENSIONS["gap"])
+
+        # Retorna retângulo com tamanho dinâmico
+        return pygame.Rect(x, y, self.card_size, self.card_size)
 
     def _draw_single_card(self, card, rect, mouse_pos):
         bg_color = COLORS["card_back"]

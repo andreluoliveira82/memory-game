@@ -8,13 +8,15 @@ class MenuUI:
         self.font_title = pygame.font.SysFont("segoeui", 60, bold=True)
         self.font_btn = pygame.font.SysFont("segoeui", 30)
         self.state = "THEME_SELECT"  # Novo controle interno
+        self.ranking_btn_rect = None
 
         # Botões de Temas
         self.theme_buttons = [
             {"text": "🐶 Animais", "value": "Animais", "rect": None},
             {"text": "🚀 Espaço", "value": "Espaço", "rect": None},
             {"text": "🧮 Matemática", "value": "Matemática", "rect": None},
-            {"text": "🧪 Química", "value": "Química", "rect": None},  # Novo!
+            {"text": "🧪 Química", "value": "Química", "rect": None},
+            {"text": "🏴 Bandeiras", "value": "Bandeiras", "rect": None},
         ]
 
         # Botões de Dificuldade
@@ -65,6 +67,24 @@ class MenuUI:
             text_rect = text_surf.get_rect(center=btn_rect.center)
             screen.blit(text_surf, text_rect)
 
+        # Desenha Botão de Ranking no rodapé (apenas na seleção de temas)
+        if self.state == "THEME_SELECT":
+            self.ranking_btn_rect = pygame.Rect(0, 0, 200, 50)
+            self.ranking_btn_rect.center = (
+                screen.get_width() // 2,
+                screen.get_height() - 100,
+            )
+
+            # Hover logic simples
+            color = (70, 70, 90)
+            if self.ranking_btn_rect.collidepoint(pygame.mouse.get_pos()):
+                color = COLORS["accent"]
+
+            pygame.draw.rect(screen, color, self.ranking_btn_rect, border_radius=10)
+
+            lbl = self.font_btn.render("🏆 Ranking", True, COLORS["text"])
+            screen.blit(lbl, lbl.get_rect(center=self.ranking_btn_rect.center))
+
     def handle_click(self, pos):
         """Retorna (Tipo, Valor) ou None"""
         for btn in self.current_buttons:
@@ -79,3 +99,8 @@ class MenuUI:
     def reset(self):
         self.state = "THEME_SELECT"
         self.current_buttons = self.theme_buttons
+
+    def check_ranking_click(self, pos):
+        if self.state == "THEME_SELECT" and self.ranking_btn_rect:
+            return self.ranking_btn_rect.collidepoint(pos)
+        return False

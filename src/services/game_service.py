@@ -5,16 +5,16 @@ from src.domain.board import Board
 
 
 class GameService:
-    def __init__(self, board: Board):
+    def __init__(self, board: Board, difficulty_multiplier: float = 1.0):
         self.board = board
+        self.difficulty_multiplier = difficulty_multiplier  # Salva o multiplicador
+
         self.moves = 0
         self.score = 0
         self.start_time = time.time()
-        self.end_time = None  # Para travar o relógio
+        self.end_time = None
         self.first_selected_pos: Optional[Tuple[int, int]] = None
-
-        # Gamification
-        self.combo_streak = 0  # Contador de acertos seguidos
+        self.combo_streak = 0
 
     def get_time_formatted(self):
         """Retorna tempo formatado. Se jogo acabou, usa o tempo final."""
@@ -46,27 +46,25 @@ class GameService:
         self.first_selected_pos = None
 
         if first_card.match_id == card.match_id:
-            # --- LÓGICA DE MATCH & COMBO ---
             first_card.mark_as_matched()
             card.mark_as_matched()
 
             self.combo_streak += 1
 
-            # Fórmula: Base (100) * Multiplicador de Combo
-            points = 100 * self.combo_streak
-            self.score += points
+            # --- NOVA LÓGICA DE PONTUAÇÃO ---
+            # Base (100) * Combo * Dificuldade
+            base_points = 100 * self.combo_streak
+            final_points = int(base_points * self.difficulty_multiplier)
 
-            # Verifica Vitória
+            self.score += final_points
+
             if self.board.all_matched:
-                self.end_time = time.time()  # Trava o relógio
-                # Bônus de tempo: (1 ponto por segundo economizado de uma base de 3 min)
-                # Opcional, por enquanto vamos focar no combo
+                self.end_time = time.time()
 
             return "MATCH"
         else:
-            # --- LÓGICA DE ERRO ---
-            self.combo_streak = 0  # Reseta combo
-            # Penalidade leve
+            self.combo_streak = 0
+            # Penalidade fixa (não escala com dificuldade para não frustrar)
             self.score = max(0, self.score - 20)
             return "NO_MATCH"
 
