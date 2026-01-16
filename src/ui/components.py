@@ -48,3 +48,52 @@ class InputBox:
         # Centraliza o texto verticalmente
         text_rect = self.txt_surface.get_rect(center=self.rect.center)
         screen.blit(self.txt_surface, text_rect)
+
+
+class Button:
+    def __init__(
+        self,
+        x,
+        y,
+        w,
+        h,
+        text,
+        font,
+        color=COLORS["card_back"],
+        hover_color=COLORS["accent"],
+        text_color=COLORS["text"],
+    ):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.text = text
+        self.font = font
+        self.base_color = color
+        self.hover_color = hover_color
+        self.text_color = text_color
+        self.current_color = color
+
+    def draw(self, screen):
+        # 1. Detecta mouse para mudar a cor (Hover)
+        mouse_pos = pygame.mouse.get_pos()
+        if self.rect.collidepoint(mouse_pos):
+            self.current_color = self.hover_color
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+        else:
+            self.current_color = self.base_color
+
+        # 2. Desenha o fundo do botão
+        pygame.draw.rect(screen, self.current_color, self.rect, border_radius=10)
+
+        # 3. Desenha a borda
+        pygame.draw.rect(screen, COLORS["text"], self.rect, width=2, border_radius=10)
+
+        # 4. Desenha o texto centralizado
+        text_surf = self.font.render(self.text, True, self.text_color)
+        text_rect = text_surf.get_rect(center=self.rect.center)
+        screen.blit(text_surf, text_rect)
+
+    def check_click(self, event):
+        """Retorna True se houve um clique válido neste botão."""
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.rect.collidepoint(event.pos):
+                return True
+        return False

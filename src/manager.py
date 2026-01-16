@@ -41,6 +41,7 @@ class GameManager:
 
     def start_game(self, difficulty_tuple):
         rows, cols = difficulty_tuple
+        self.current_difficulty = difficulty_tuple
 
         # --- LÓGICA DE TAMANHO DINÂMICO ---
         # Se tiver muitas linhas (Difícil), usa cartas menores (Compact Mode)
@@ -144,24 +145,34 @@ class GameManager:
                 elif self.state == "GAME":
                     if event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_ESCAPE:
-                            self.return_to_menu()  # Usa o método seguro de retorno
+                            self.return_to_menu()
 
-                    # CORREÇÃO DO SCROLL: Adicionado 'and event.button == 1'
-                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                        if not self.game_ui.waiting_to_hide:
-                            self.game_ui.handle_click(event.pos)
+                    # O 'check_click' agora é feito dentro do handle_click da UI
+                    # Nós passamos o evento inteiro pra lá, não só a posição
+                    action = self.game_ui.handle_click(event)
 
-                            if (
-                                self.game_ui.service.board.all_matched
-                                and not self.game_ui.saved
-                            ):
-                                self.repository.save_score(
-                                    self.player_name,
-                                    self.game_ui.service.score,
-                                    self.selected_theme,
-                                    self.selected_difficulty_label,
-                                )
-                                self.game_ui.saved = True
+                    # Verifica ações retornadas pelos botões de Game Over
+                    if action == "MENU":
+                        self.return_to_menu()
+                    elif action == "RESTART":
+                        # Reinicia com a mesma dificuldade e tema atual
+                        # A dificuldade está salva em self.selected_difficulty_label?
+                        # Precisamos recuperar a tupla (rows, cols)
+                        # Dica: Podemos salvar a tupla em self.current_difficulty no start_game
+                        self.start_game(self.current_difficulty)
+
+                    # Verifica se precisa salvar (Lógica mantida)
+                    if (
+                        self.game_ui.service.board.all_matched
+                        and not self.game_ui.saved
+                    ):
+                        self.repository.save_score(
+                            self.player_name,
+                            self.game_ui.service.score,
+                            self.selected_theme,
+                            self.selected_difficulty_label,
+                        )
+                        self.game_ui.saved = True
 
             # --- DESENHO ---
             self.screen.fill(COLORS["background"])
