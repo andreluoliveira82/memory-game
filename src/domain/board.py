@@ -1,79 +1,52 @@
 # src/domain/board.py
-
-import random
 from typing import List, Optional
+
 from src.domain.card import Card
+from src.domain.strategies import EmojiStrategy, GameStrategy
+
 
 class Board:
-    """
-    Representa o tabuleiro do jogo contendo uma grade de cartas.
-    
-    Responsabilidades:
-        - Gerar e embaralhar pares de cartas.
-        - Gerenciar o acesso às cartas por coordenadas (linha, coluna).
-        - Verificar se o jogo foi concluído.
-    """
-
-    def __init__(self, rows: int, cols: int):
-        """
-        Inicializa o tabuleiro com as dimensões especificadas.
-        
-        Args:
-            rows (int): Número de linhas.
-            cols (int): Número de colunas.
-            
-        Raises:
-            ValueError: Se o número total de cartas (rows * cols) for ímpar.
-        """
+    def __init__(self, rows: int, cols: int, strategy: GameStrategy = None):
         if (rows * cols) % 2 != 0:
-            raise ValueError("O número total de cartas deve ser par para formar pares!")
-        
+            raise ValueError("O número total de cartas deve ser par!")
+
         self.rows = rows
         self.cols = cols
         self.grid: List[List[Card]] = []
-        self._initialize_board()
 
-    def _initialize_board(self) -> None:
-        """Cria as cartas, embaralha e as distribui na grade."""
-        total_pairs = (self.rows * self.cols) // 2
-        # Usando letras do alfabeto como valores temporários (A, B, C...)
-        # Em um projeto real, isso poderia ser injetado ou vir de um enum
-        values = [chr(65 + i) for i in range(total_pairs)] * 2
-        random.shuffle(values)
+        # Se nenhuma estratégia for passada, usa o padrão (Emojis de Animais)
+        self.strategy = strategy if strategy else EmojiStrategy(theme="Animais")
 
-        # Transforma a lista linear em uma matriz (grade)
-        for r in range(self.rows):
-            row_cards = []
-            for c in range(self.cols):
-                value = values.pop()
-                row_cards.append(Card(value=value))
-            self.grid.append(row_cards)
+        self.reset()
+
+    def reset(self, new_strategy: GameStrategy = None) -> None:
+        """Reinicia o jogo, opcionalmente trocando a estratégia/tema."""
+        if new_strategy:
+            self.strategy = new_strategy
+
+        num_pairs = (self.rows * self.cols) // 2
+        cards = self.strategy.generate_cards(num_pairs)
+
+        # Preenche a grid (transforma lista linear em matriz)
+        self.grid = []
+        iterator = iter(cards)
+        for _ in range(self.rows):
+            row = []
+            for _ in range(self.cols):
+                row.append(next(iterator))
+            self.grid.append(row)
 
     def get_card(self, row: int, col: int) -> Optional[Card]:
-        """
-        Retorna a carta em uma posição específica.
-        
-        Args:
-            row (int): Índice da linha.
-            col (int): Índice da coluna.
-        """
         if 0 <= row < self.rows and 0 <= col < self.cols:
             return self.grid[row][col]
         return None
 
     @property
     def all_matched(self) -> bool:
-        """Verifica se todas as cartas do tabuleiro já foram combinadas."""
         return all(card.is_matched for row in self.grid for card in row)
 
-    def reset(self, new_values: list[str]):
-        """Reinicia o tabuleiro com novos valores e embaralhamento."""
-        random.shuffle(new_values)
-        self.grid = []
-        
-
     def __str__(self) -> str:
-        """Representação visual simples para o modo CLI."""
+        # Atualizado para usar display_content
         header = "    " + " ".join(str(i) for i in range(self.cols))
         rows_str = [header]
         for i, row in enumerate(self.grid):

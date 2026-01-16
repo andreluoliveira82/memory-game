@@ -1,59 +1,79 @@
+import time
 from typing import Optional, Tuple
+
 from src.domain.board import Board
-from src.domain.card import Card
+
 
 class GameService:
-    """
-    Orquestrador das regras de negócio do Jogo da Memória.
-    
-    Gerencia o estado da rodada (primeira ou segunda carta escolhida),
-    valida movimentos e rastreia o progresso.
-    """
-
     def __init__(self, board: Board):
         self.board = board
         self.moves = 0
+        self.score = 0
+        self.start_time = time.time()
+        self.end_time = None  # Para travar o relógio
         self.first_selected_pos: Optional[Tuple[int, int]] = None
 
+        # Gamification
+        self.combo_streak = 0  # Contador de acertos seguidos
+
+    def get_time_formatted(self):
+        """Retorna tempo formatado. Se jogo acabou, usa o tempo final."""
+        if self.end_time:
+            total_seconds = int(self.end_time - self.start_time)
+        else:
+            total_seconds = int(time.time() - self.start_time)
+
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+        return f"{minutes:02}:{seconds:02}"
+
     def pick_card(self, row: int, col: int) -> str:
-        """
-        Processa a escolha de uma carta pelo jogador.
-        
-        Returns:
-            str: Mensagem indicando o resultado da ação (MATCH, NO_MATCH, FIRST_PICK, INVALID).
-        """
         card = self.board.get_card(row, col)
 
-        # Validações básicas
         if not card or card.is_revealed or card.is_matched:
             return "INVALID"
 
         card.reveal()
 
-        # Se for a primeira carta da rodada
         if self.first_selected_pos is None:
             self.first_selected_pos = (row, col)
             return "FIRST_PICK"
 
-        # Se for a segunda carta, comparamos com a primeira
+        # Segunda carta escolhida
         self.moves += 1
         r1, c1 = self.first_selected_pos
         first_card = self.board.get_card(r1, c1)
-        
-        self.first_selected_pos = None  # Reseta para a próxima rodada
+        self.first_selected_pos = None
 
-        if first_card.value == card.value:
+        if first_card.match_id == card.match_id:
+            # --- LÓGICA DE MATCH & COMBO ---
             first_card.mark_as_matched()
             card.mark_as_matched()
+
+            self.combo_streak += 1
+
+            # Fórmula: Base (100) * Multiplicador de Combo
+            points = 100 * self.combo_streak
+            self.score += points
+
+            # Verifica Vitória
+            if self.board.all_matched:
+                self.end_time = time.time()  # Trava o relógio
+                # Bônus de tempo: (1 ponto por segundo economizado de uma base de 3 min)
+                # Opcional, por enquanto vamos focar no combo
+
             return "MATCH"
         else:
-            # Note: A UI será responsável por chamar o 'hide' após um delay
-            # ou o service pode retornar os objetos para a UI gerenciar.
+            # --- LÓGICA DE ERRO ---
+            self.combo_streak = 0  # Reseta combo
+            # Penalidade leve
+            self.score = max(0, self.score - 20)
             return "NO_MATCH"
 
-    def hide_cards(self, pos1: Tuple[int, int], pos2: Tuple[int, int]):
-        """Desvira duas cartas caso não sejam um par."""
+    def hide_cards(self, pos1, pos2):
         c1 = self.board.get_card(*pos1)
         c2 = self.board.get_card(*pos2)
-        if c1: c1.hide()
-        if c2: c2.hide()
+        if c1:
+            c1.hide()
+        if c2:
+            c2.hide()
