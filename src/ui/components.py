@@ -1,6 +1,7 @@
 # src/ui/components.py
 
 import pygame
+import random
 
 from src.ui.styles import COLORS
 
@@ -97,3 +98,38 @@ class Button:
             if self.rect.collidepoint(event.pos):
                 return True
         return False
+
+
+class ParticleSystem:
+    def __init__(self):
+        self.particles = []
+
+    def emit(self, x, y, color):
+        # Cria uma partícula com velocidade e vida aleatória
+        self.particles.append({
+            "x": x, "y": y,
+            "vx": random.uniform(-4, 4),
+            "vy": random.uniform(-6, -2), # Sobe
+            "life": 255,
+            "color": color,
+            "size": random.randint(4, 8)
+        })
+
+    def update_and_draw(self, screen):
+        for p in self.particles[:]:
+            p["x"] += p["vx"]
+            p["y"] += p["vy"]
+            p["vy"] += 0.2 # Gravidade
+            p["life"] -= 3 # Fade out
+            
+            if p["life"] <= 0:
+                self.particles.remove(p)
+                continue
+            
+            # Desenha com transparência (Gambiarra: desenha solido pois Alpha no pygame é lento sem surface separada)
+            pygame.draw.circle(screen, p["color"], (int(p["x"]), int(p["y"])), p["size"])
+
+    def explode(self, x, y):
+        colors = [(255,0,0), (0,255,0), (0,0,255), (255,255,0), (255,0,255)]
+        for _ in range(30): # 30 particulas por explosão
+            self.emit(x, y, random.choice(colors))

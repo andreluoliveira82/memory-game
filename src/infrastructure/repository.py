@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 from typing import Dict, List
 
 
@@ -9,16 +10,22 @@ class ScoreRepository:
     FILE_PATH = "scores.json"
 
     def save_score(self, player_name: str, score: int, theme: str, difficulty: str):
-        """Salva uma nova entrada de pontuação."""
         data = self._load_file()
+
+        # Cria timestamp formatado (Ex: 15/01 14:30)
+        timestamp = datetime.now().strftime("%d/%m %H:%M")
 
         new_entry = {
             "name": player_name,
             "score": score,
             "theme": theme,
             "difficulty": difficulty,
+            "date": timestamp,  # Novo campo
         }
         data.append(new_entry)
+        data.sort(key=lambda x: x["score"], reverse=True)
+        data = data[:50]
+        self._save_file(data)
 
         # Ordena por pontuação (maior para menor) e mantém top 50
         data.sort(key=lambda x: x["score"], reverse=True)

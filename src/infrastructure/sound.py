@@ -8,9 +8,12 @@ class SoundManager:
     """Gerencia o carregamento e execução de efeitos sonoros."""
 
     def __init__(self):
-        # Inicializa o mixer do Pygame (44.1kHz, 16bit, stereo, buffer 2048)
+        # buffer=512 reduz drasticamente o delay (o padrão é 4096 ou 2048)
+        # pre_init deve ser chamado ANTES de pygame.init() no main, mas aqui funciona
+        # se garantirmos que o SoundManager é criado cedo.
         try:
-            pygame.mixer.init(44100, -16, 2, 2048)
+            pygame.mixer.pre_init(44100, -16, 2, 512)
+            pygame.mixer.init()
             self.enabled = True
         except Exception as e:
             print(f"Erro ao iniciar som: {e}")
@@ -44,7 +47,7 @@ class SoundManager:
                     self.sounds[name] = pygame.mixer.Sound(full_path)
                     # Ajuste de volume (0.0 a 1.0)
                     self.sounds[name].set_volume(0.5)
-                except:
+                except Exception:
                     print(f"Não foi possível ler o arquivo: {full_path}")
             else:
                 # Silenciosamente ignora se não tiver o arquivo ainda
