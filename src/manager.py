@@ -1,4 +1,11 @@
 # ARQUIVO: src/manager.py
+"""
+Gerenciador principal do jogo (State Manager).
+
+Controla o fluxo entre telas (login, menu, jogo, ranking, configurações)
+e gerencia o ciclo de vida da aplicação.
+"""
+
 import os
 
 import pygame
@@ -11,12 +18,21 @@ from src.ui.components import InputBox
 from src.ui.gui import GraphicUI
 from src.ui.menu import MenuUI
 from src.ui.ranking import RankingUI
+from src.ui.settings import SettingsUI
 from src.ui.statistics import StatisticsUI
-from src.ui.styles import DIMENSIONS, THEMES
+from src.ui.styles import COLORS, DIMENSIONS
 
 
 class GameManager:
+    """
+    Gerenciador central do jogo.
+
+    Implementa uma máquina de estados para controlar o fluxo da aplicação:
+    LOGIN → MENU → GAME/RANKING/STATS/SETTINGS
+    """
+
     def __init__(self):
+        """Inicializa o gerenciador e todos os subsistemas."""
         os.environ["SDL_VIDEO_CENTERED"] = "1"
         pygame.init()
 
@@ -28,9 +44,11 @@ class GameManager:
         self.repository = ScoreRepository()
         self.state = "LOGIN"
 
+        # Inicializa todas as telas
         self.menu = MenuUI()
         self.ranking_ui = RankingUI(self.repository)
-        self.stats_ui = StatisticsUI(self.repository)  # INICIALIZAÇÃO
+        self.stats_ui = StatisticsUI(self.repository)
+        self.settings_ui = SettingsUI()
 
         self.game_ui = None
         self.player_name = ""
@@ -39,13 +57,16 @@ class GameManager:
         self.input_box = InputBox(300, 350, 300, 60, self.font_login)
 
         self.selected_theme = None
-        self.current_theme = 'dracula'
-        
         self.selected_difficulty_label = ""
         self.current_difficulty = (4, 4)
 
-        
-    def start_game(self, difficulty_tuple):
+    def start_game(self, difficulty_tuple: tuple) -> None:
+        """
+        Inicia uma nova partida.
+
+        Args:
+            difficulty_tuple: Tupla (rows, cols) definindo a grade
+        """
         rows, cols = difficulty_tuple
         self.current_difficulty = difficulty_tuple
 
@@ -93,13 +114,15 @@ class GameManager:
         except ValueError as e:
             print(f"Erro Fatal: {e}")
 
-    def return_to_menu(self):
+    def return_to_menu(self) -> None:
+        """Retorna ao menu principal."""
         self.state = "MENU"
         os.environ["SDL_VIDEO_CENTERED"] = "1"
         self.screen = pygame.display.set_mode(self.menu_size)
         self.menu.reset()
 
-    def run(self):
+    def run(self) -> None:
+        """Loop principal da aplicação."""
         running = True
         while running:
             if self.state != "MENU":
@@ -127,8 +150,10 @@ class GameManager:
                             if type_action == "ACTION":
                                 if value == "RANKING":
                                     self.state = "RANKING"
-                                elif value == "STATS":  # NOVO: Vai para Estatísticas
+                                elif value == "STATS":
                                     self.state = "STATS"
+                                elif value == "SETTINGS":
+                                    self.state = "SETTINGS"
                                 elif value == "BACK":
                                     self.menu.reset()
 
@@ -146,13 +171,25 @@ class GameManager:
                         if self.ranking_ui.handle_click(event) == "BACK":
                             self.state = "MENU"
 
-                # --- STATS (DASHBOARD) ---
+                # --- STATS ---
                 elif self.state == "STATS":
                     if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                         self.state = "MENU"
                     if event.type == pygame.MOUSEBUTTONDOWN:
                         if self.stats_ui.handle_click(event) == "BACK":
                             self.state = "MENU"
+
+                # --- SETTINGS ---
+                elif self.state == "SETTINGS":
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                        self.state = "MENU"
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        action = self.settings_ui.handle_click(event)
+                        if action == "BACK":
+                            self.state = "MENU"
+                        elif action == "THEME_CHANGED":
+                            # Atualiza tema em todas as telas
+                            self._refresh_all_screens()
 
                 # --- GAME ---
                 elif self.state == "GAME":
@@ -182,7 +219,6 @@ class GameManager:
                         self.game_ui.saved = True
 
             # --- DESENHO ---
-            COLORS = THEMES[self.current_theme]
             self.screen.fill(COLORS["background"])
 
             if self.state == "LOGIN":
@@ -192,17 +228,20 @@ class GameManager:
             elif self.state == "RANKING":
                 self.ranking_ui.draw(self.screen)
             elif self.state == "STATS":
-                self.stats_ui.draw(self.screen)  # DESENHA STATS
+                self.stats_ui.draw(self.screen)
+            elif self.state == "SETTINGS":
+                self.settings_ui.draw(self.screen)
             elif self.state == "GAME":
                 self.game_ui.update()
                 self.game_ui.draw()
 
             pygame.display.flip()
             self.clock.tick(60)
+
         pygame.quit()
 
-    def _draw_login(self):
-        COLORS = THEMES[self.current_theme]
+    def _draw_login(self) -> None:
+        """Renderiza a tela de login."""
         title = self.font_login.render("Digite seu Nome:", True, COLORS["text"])
         title_rect = title.get_rect(center=(450, 280))
         self.screen.blit(title, title_rect)
@@ -211,3 +250,14 @@ class GameManager:
             "ENTER para confirmar", True, COLORS["accent"]
         )
         self.screen.blit(hint, (360, 420))
+
+    def _refresh_all_screens(self) -> None:
+        """
+        Atualiza cores em todas as telas após mudança de tema.
+
+        Este método força a recriação de elementos visuais que
+        dependem das cores do tema.
+        """
+        # As telas já usam COLORS globalmente, então apenas redesenham
+        # Mas podemos adicionar lógica específica se necessário no futuro
+        pass
