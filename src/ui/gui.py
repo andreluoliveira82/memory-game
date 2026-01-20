@@ -1,14 +1,39 @@
 # ARQUIVO: src/ui/gui.py
+"""
+Interface gráfica principal do jogo da memória.
+
+Gerencia renderização do tabuleiro, estatísticas, animações e interações
+do jogador durante uma partida.
+"""
+
 import pygame
 
 from src.infrastructure.sound import SoundManager
 from src.services.game_service import GameService
-from src.ui.components import Button, ParticleSystem
+from src.ui.components import (
+    AdvancedParticleSystem,
+    Button,
+    CardFlipAnimation,
+)
 from src.ui.styles import COLORS, DIMENSIONS
 
 
 class GraphicUI:
+    """
+    Interface gráfica do jogo usando Pygame.
+
+    Responsável por toda a lógica de apresentação, incluindo renderização
+    de cartas, estatísticas, animações e tela de Game Over.
+    """
+
     def __init__(self, service: GameService, card_size: int = None):
+        """
+        Inicializa a interface gráfica.
+
+        Args:
+            service: Instância do serviço de jogo contendo a lógica
+            card_size: Tamanho customizado das cartas (padrão: do tema)
+        """
         self.service = service
         self.screen = pygame.display.get_surface()
         self.width = self.screen.get_width()
@@ -23,29 +48,13 @@ class GraphicUI:
             (service.board.cols - 1) * DIMENSIONS["gap"]
         )
 
-        # --- INICIALIZAÇÃO DE FONTES ---
-        try:
-            self.font_base_name = "segoeuiemoji"
-            self.font_title = pygame.font.SysFont("segoeui", 48, bold=True)
-            self.font_stats = pygame.font.SysFont("consolas", 22)
-            self.font_msg = pygame.font.SysFont("segoeui", 28)
-            # Fonte levemente menor para caber nos botões confortavelmente
-            self.font_btn = pygame.font.SysFont("segoeui", 20, bold=True)
-            self.font_emoji = pygame.font.SysFont("segoeuiemoji", 60)
-            self.font_score_big = pygame.font.SysFont(
-                "segoeui", 55, bold=True
-            )  # Fonte destaque
-        except:
-            self.font_base_name = "arial"
-            self.font_title = pygame.font.SysFont("arial", 40, bold=True)
-            self.font_stats = pygame.font.SysFont("arial", 20)
-            self.font_msg = pygame.font.SysFont("arial", 24)
-            self.font_btn = pygame.font.SysFont("arial", 20, bold=True)
-            self.font_emoji = pygame.font.SysFont("arial", 60)
-            self.font_score_big = pygame.font.SysFont("arial", 50, bold=True)
+        # Inicialização de Fontes
+        self._init_fonts()
 
-        # Sistemas Visuais
-        self.particles = ParticleSystem()
+        # Sistemas Visuais Avançados
+        self.particles = AdvancedParticleSystem()
+        self.flip_animations: dict[tuple, CardFlipAnimation] = {}
+
         self.stars_earned = 0
         self.animation_triggered = False
 
@@ -56,11 +65,31 @@ class GraphicUI:
 
         self.saved = False
 
-        # --- BOTÕES DE GAME OVER ---
-        # Inicializamos aqui, mas as posições exatas são definidas no draw()
-        # para garantir centralização dinâmica
+        # Botões de Game Over
+        self._init_game_over_buttons()
 
-        # Botão Principal (Destaque)
+    def _init_fonts(self) -> None:
+        """Inicializa todas as fontes do jogo com fallback."""
+        try:
+            self.font_base_name = "segoeuiemoji"
+            self.font_title = pygame.font.SysFont("segoeui", 48, bold=True)
+            self.font_stats = pygame.font.SysFont("consolas", 22)
+            self.font_msg = pygame.font.SysFont("segoeui", 28)
+            self.font_btn = pygame.font.SysFont("segoeui", 20, bold=True)
+            self.font_emoji = pygame.font.SysFont("segoeuiemoji", 60)
+            self.font_score_big = pygame.font.SysFont("segoeui", 55, bold=True)
+        except:
+            # Fallback para Arial caso Segoe UI não esteja disponível
+            self.font_base_name = "arial"
+            self.font_title = pygame.font.SysFont("arial", 40, bold=True)
+            self.font_stats = pygame.font.SysFont("arial", 20)
+            self.font_msg = pygame.font.SysFont("arial", 24)
+            self.font_btn = pygame.font.SysFont("arial", 20, bold=True)
+            self.font_emoji = pygame.font.SysFont("arial", 60)
+            self.font_score_big = pygame.font.SysFont("arial", 50, bold=True)
+
+    def _init_game_over_buttons(self) -> None:
+        """Inicializa botões da tela de Game Over."""
         self.btn_restart = Button(
             x=0,
             y=0,
@@ -73,7 +102,6 @@ class GraphicUI:
             text_color=(40, 40, 40),
         )
 
-        # Botões Secundários (Lado a Lado)
         self.btn_menu = Button(
             x=0,
             y=0,
@@ -98,16 +126,30 @@ class GraphicUI:
             text_color=COLORS["text"],
         )
 
-    def _calculate_stars(self):
+    def _calculate_stars(self) -> int:
+        """
+        Calcula quantas estrelas o jogador ganhou baseado na eficiência.
+
+        Returns:
+            Número de estrelas (1-3)
+        """
         pairs = (self.service.board.rows * self.service.board.cols) // 2
         moves = self.service.moves
-        if moves <= pairs * 1.5:
-            return 3
-        elif moves <= pairs * 2.5:
-            return 2
-        return 1
 
-    def update(self):
+        if moves <= pairs * 1.5:
+            return 3  # Perfeito ou quase
+        elif moves <= pairs * 2.5:
+            return 2  # Bom
+        return 1  # Completou, mas com erros
+
+    def update(self) -> None:
+        """Atualiza estado das animações e timers."""
+        # Atualiza animações de flip
+        for key in list(self.flip_animations.keys()):
+            if not self.flip_animations[key].update():
+                del self.flip_animations[key]
+
+        # Timer para esconder cartas erradas
         if self.waiting_to_hide:
             if pygame.time.get_ticks() - self.hide_timestamp > 1000:
                 self.service.hide_cards(*self.cards_to_hide)
@@ -115,8 +157,17 @@ class GraphicUI:
                 self.cards_to_hide = None
                 self.message = "Tente novamente!"
 
-    def handle_click(self, event):
-        # 1. Se o jogo acabou, checa cliques nos botões da overlay
+    def handle_click(self, event: pygame.event.Event) -> str | None:
+        """
+        Processa cliques do mouse.
+
+        Args:
+            event: Evento do Pygame
+
+        Returns:
+            Ação a ser executada ("RESTART", "MENU", "RANKING") ou None
+        """
+        # Se o jogo acabou, processa cliques nos botões da overlay
         if self.service.board.all_matched:
             if self.btn_restart.check_click(event):
                 self.sounds.play("click")
@@ -126,10 +177,10 @@ class GraphicUI:
                 return "MENU"
             if self.btn_ranking.check_click(event):
                 self.sounds.play("click")
-                return "RANKING"  # Nova Ação
+                return "RANKING"
             return None
 
-        # 2. Jogo rodando
+        # Jogo em andamento
         if self.waiting_to_hide:
             return None
 
@@ -142,21 +193,47 @@ class GraphicUI:
                         break
         return None
 
-    def _process_pick(self, r, c):
+    def _process_pick(self, r: int, c: int) -> None:
+        """
+        Processa a escolha de uma carta pelo jogador.
+
+        Args:
+            r: Linha da carta
+            c: Coluna da carta
+        """
         first_pos = self.service.first_selected_pos
         current_pos = (r, c)
         result = self.service.pick_card(r, c)
 
+        # Inicia animação de flip
+        card_rect = self._get_card_rect(r, c)
+        self.flip_animations[current_pos] = CardFlipAnimation(card_rect)
+
         if result == "MATCH":
             self.sounds.play("match")
             combo = self.service.combo_streak
-            if combo > 1:
-                self.message = f"COMBO x{combo}! (+{100 * combo})"
-            else:
-                self.message = "Boa! Um par!"
 
+            # Efeitos visuais baseados no combo
+            if combo == 1:
+                self.particles.sparkle(card_rect.centerx, card_rect.centery)
+                self.message = "Boa! Um par!"
+            elif combo >= 5:
+                self.particles.firework(card_rect.centerx, card_rect.centery)
+                self.message = f"🔥 COMBO x{combo}! (+{100 * combo})"
+            else:
+                self.particles.sparkle(card_rect.centerx, card_rect.centery)
+                self.message = f"COMBO x{combo}! (+{100 * combo})"
+
+            # Vitória
             if self.service.board.all_matched:
                 self.sounds.play("win")
+
+                # Efeito especial baseado na performance
+                stars = self._calculate_stars()
+                if stars == 3:
+                    self.particles.rainbow_burst(self.width // 2, self.height // 2)
+                else:
+                    self.particles.confetti(self.width // 2, self.height // 2)
 
         elif result == "NO_MATCH":
             self.sounds.play("error")
@@ -169,61 +246,67 @@ class GraphicUI:
             self.sounds.play("flip")
             self.message = "Escolha o par..."
 
-    def draw(self):
+    def draw(self) -> None:
+        """Renderiza toda a interface do jogo."""
         self.screen.fill(COLORS["background"])
 
+        # Título
         title = self.font_title.render("Memory Game", True, COLORS["accent"])
         self.screen.blit(title, title.get_rect(center=(self.width // 2, 40)))
 
+        # Estatísticas
         self._draw_stats()
 
+        # Tabuleiro de cartas
         mouse_pos = pygame.mouse.get_pos()
         for r in range(self.service.board.rows):
             for c in range(self.service.board.cols):
                 card = self.service.board.get_card(r, c)
                 rect = self._get_card_rect(r, c)
-                self._draw_single_card(card, rect, mouse_pos)
+                self._draw_single_card(card, rect, mouse_pos, (r, c))
 
+        # Mensagem de feedback
         if not self.service.board.all_matched:
             msg_surf = self.font_msg.render(self.message, True, COLORS["accent"])
             msg_rect = msg_surf.get_rect(center=(self.width // 2, self.height - 50))
             self.screen.blit(msg_surf, msg_rect)
 
+        # Overlay de Game Over
         if self.service.board.all_matched:
             self._draw_game_over_overlay()
-            self.particles.update_and_draw(self.screen)
 
-    def _draw_game_over_overlay(self):
+        # Partículas (sempre por cima)
+        self.particles.update_and_draw(self.screen)
+
+    def _draw_game_over_overlay(self) -> None:
+        """Renderiza a tela de Game Over com resultados e botões."""
         if not self.animation_triggered:
             self.stars_earned = self._calculate_stars()
-            self.particles.explode(self.width // 2, self.height // 2)
             self.animation_triggered = True
 
-        # Fundo Transparente
+        # Fundo semi-transparente
         overlay = pygame.Surface((self.width, self.height))
-        overlay.set_alpha(210)  # Um pouco mais escuro para focar no modal
+        overlay.set_alpha(210)
         overlay.fill((15, 15, 20))
         self.screen.blit(overlay, (0, 0))
 
-        # Painel Central (Aumentei a altura para caber melhor)
+        # Painel central
         card_w, card_h = 480, 460
         cx, cy = self.width // 2, self.height // 2
         card_rect = pygame.Rect(0, 0, card_w, card_h)
         card_rect.center = (cx, cy)
 
-        # Desenho do Painel
+        # Desenho do painel
         pygame.draw.rect(self.screen, (50, 52, 64), card_rect, border_radius=20)
         pygame.draw.rect(
             self.screen, COLORS["accent"], card_rect, width=2, border_radius=20
         )
 
-        # --- LAYOUT INTERNO DO CARD ---
-
-        # 1. Título
+        # Título
         lbl = self.font_title.render("NÍVEL CONCLUÍDO!", True, COLORS["success"])
         self.screen.blit(lbl, lbl.get_rect(center=(cx, cy - 170)))
 
-        # 2. Estrelas
+        # Estrelas
         star_str = "⭐" * self.stars_earned
         base_stars = self.font_emoji.render("⭐" * 3, True, (80, 80, 90))
         gold_stars = self.font_emoji.render(star_str, True, (255, 215, 0))
@@ -231,10 +314,9 @@ class GraphicUI:
         stars_y = cy - 110
         self.screen.blit(base_stars, base_stars.get_rect(center=(cx, stars_y)))
         if self.stars_earned > 0:
-            # Pequeno ajuste de alinhamento visual se necessário
             self.screen.blit(gold_stars, gold_stars.get_rect(center=(cx, stars_y)))
 
-        # 3. Pontuação Principal (Grande)
+        # Pontuação
         score_lbl = self.font_stats.render("PONTUAÇÃO FINAL", True, (180, 180, 180))
         score_val = self.font_score_big.render(
             str(self.service.score), True, COLORS["text"]
@@ -243,17 +325,15 @@ class GraphicUI:
         self.screen.blit(score_lbl, score_lbl.get_rect(center=(cx, cy - 40)))
         self.screen.blit(score_val, score_val.get_rect(center=(cx, cy + 10)))
 
-        # 4. Tempo (Menor)
+        # Tempo
         time_str = f"Tempo: {self.service.get_time_formatted()}"
         time_surf = self.font_msg.render(time_str, True, COLORS["accent"])
         self.screen.blit(time_surf, time_surf.get_rect(center=(cx, cy + 60)))
 
-        # 5. Botões
-        # Restart (Grande)
+        # Botões
         self.btn_restart.rect.center = (cx, cy + 130)
         self.btn_restart.draw(self.screen)
 
-        # Menu e Ranking (Lado a Lado abaixo)
         button_gap = 20
         total_w_secondary = (
             self.btn_menu.rect.width + self.btn_ranking.rect.width + button_gap
@@ -271,39 +351,74 @@ class GraphicUI:
         self.btn_menu.draw(self.screen)
         self.btn_ranking.draw(self.screen)
 
-    # --- Métodos Helpers (Mantidos Iguais) ---
-    def _draw_result_stat(self, label, value, x, y):
-        lbl_surf = self.font_stats.render(label, True, (180, 180, 180))
-        val_surf = self.font_title.render(value, True, COLORS["text"])
-        self.screen.blit(lbl_surf, lbl_surf.get_rect(center=(x, y - 20)))
-        self.screen.blit(val_surf, val_surf.get_rect(center=(x, y + 20)))
-
-    def _draw_stats(self):
+    def _draw_stats(self) -> None:
+        """Renderiza as estatísticas do jogo (movimentos, pontos, tempo)."""
         section_w = self.width // 3
         y_pos = 90
+
         mov_text = f"Movimentos: {self.service.moves}"
         self._draw_stat_box(mov_text, (section_w * 0 + section_w // 2, y_pos))
+
         score_text = f"Pontos: {self.service.score}"
-        self._draw_stat_box(
-            score_text,
-            (section_w * 1 + section_w // 2, y_pos),
-            COLORS["success"] if self.service.combo_streak > 1 else COLORS["text"],
+        score_color = (
+            COLORS["success"] if self.service.combo_streak > 1 else COLORS["text"]
         )
+        self._draw_stat_box(
+            score_text, (section_w * 1 + section_w // 2, y_pos), score_color
+        )
+
         time_text = f"Tempo: {self.service.get_time_formatted()}"
         self._draw_stat_box(time_text, (section_w * 2 + section_w // 2, y_pos))
 
-    def _draw_stat_box(self, text, pos, color=COLORS["text"]):
+    def _draw_stat_box(self, text: str, pos: tuple, color: tuple = None) -> None:
+        """
+        Renderiza uma caixa de estatística individual.
+
+        Args:
+            text: Texto a exibir
+            pos: Posição (x, y)
+            color: Cor do texto (padrão: tema)
+        """
+        if color is None:
+            color = COLORS["text"]
         surf = self.font_stats.render(text, True, color)
         self.screen.blit(surf, surf.get_rect(center=pos))
 
-    def _get_card_rect(self, row, col):
+    def _get_card_rect(self, row: int, col: int) -> pygame.Rect:
+        """
+        Calcula o retângulo de uma carta no grid.
+
+        Args:
+            row: Linha da carta
+            col: Coluna da carta
+
+        Returns:
+            Retângulo com posição e tamanho da carta
+        """
         start_x = (self.width - self.grid_width) // 2
         start_y = DIMENSIONS["header_height"]
         x = start_x + col * (self.card_size + DIMENSIONS["gap"])
         y = start_y + row * (self.card_size + DIMENSIONS["gap"])
         return pygame.Rect(x, y, self.card_size, self.card_size)
 
-    def _draw_single_card(self, card, rect, mouse_pos):
+    def _draw_single_card(
+        self, card, rect: pygame.Rect, mouse_pos: tuple, pos: tuple
+    ) -> None:
+        """
+        Renderiza uma carta individual com animações.
+
+        Args:
+            card: Objeto Card
+            rect: Retângulo da carta
+            mouse_pos: Posição do mouse
+            pos: Tupla (row, col)
+        """
+        # Aplica animação de flip se existir
+        if pos in self.flip_animations:
+            anim = self.flip_animations[pos]
+            rect = anim.rect
+
+        # Define cor de fundo
         bg_color = COLORS["card_back"]
         if not card.is_revealed and not card.is_matched and not self.waiting_to_hide:
             if rect.collidepoint(mouse_pos):
@@ -313,15 +428,19 @@ class GraphicUI:
         if card.is_matched:
             bg_color = COLORS["success"]
 
+        # Sombra
         shadow = rect.copy()
         shadow.move_ip(4, 4)
         pygame.draw.rect(
             self.screen, (20, 20, 20), shadow, border_radius=DIMENSIONS["border_radius"]
         )
+
+        # Carta
         pygame.draw.rect(
             self.screen, bg_color, rect, border_radius=DIMENSIONS["border_radius"]
         )
 
+        # Conteúdo
         if card.is_revealed or card.is_matched:
             pygame.draw.rect(
                 self.screen,
@@ -335,13 +454,22 @@ class GraphicUI:
             q_surf = self.font_msg.render("?", True, (255, 255, 255, 50))
             self.screen.blit(q_surf, q_surf.get_rect(center=rect.center))
 
-    def _draw_dynamic_text(self, text, rect):
+    def _draw_dynamic_text(self, text: str, rect: pygame.Rect) -> None:
+        """
+        Renderiza texto ajustando tamanho da fonte automaticamente.
+
+        Args:
+            text: Texto a exibir
+            rect: Retângulo onde o texto deve caber
+        """
         max_width = rect.width - 10
         font_size = 40
+
         while font_size > 12:
             font = pygame.font.SysFont(self.font_base_name, font_size)
             text_surf = font.render(text, True, COLORS["text_card"])
             if text_surf.get_width() <= max_width:
                 break
             font_size -= 2
+
         self.screen.blit(text_surf, text_surf.get_rect(center=rect.center))

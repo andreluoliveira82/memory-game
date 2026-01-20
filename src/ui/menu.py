@@ -8,7 +8,7 @@ class MenuUI:
     def __init__(self):
         self.font_title = pygame.font.SysFont("segoeui", 60, bold=True)
         self.font_icon = pygame.font.SysFont("segoeuiemoji", 60)
-        self.font_btn = pygame.font.SysFont("segoeui", 22, bold=True)
+        self.font_btn = pygame.font.SysFont("segoeui", 20, bold=True)
         self.font_sub = pygame.font.SysFont("segoeui", 18)
 
         self.state = "THEME_SELECT"
@@ -22,7 +22,7 @@ class MenuUI:
             {"text": "Bandeiras", "icon": "🏴", "value": "Bandeiras", "rect": None},
         ]
 
-        # --- BOTÕES DE DIFICULDADE (Melhorados) ---
+        # --- BOTÕES DE DIFICULDADE ---
         self.difficulty_buttons = [
             {
                 "text": "Fácil",
@@ -30,26 +30,29 @@ class MenuUI:
                 "value": (4, 4),
                 "rect": None,
                 "color": (80, 250, 123),
-            },  # Verde
+            },
             {
                 "text": "Médio",
                 "sub": "Grade 6x4 - Desafio",
                 "value": (6, 4),
                 "rect": None,
                 "color": (255, 184, 108),
-            },  # Laranja
+            },
             {
                 "text": "Difícil",
                 "sub": "Grade 6x6 - Hardcore",
                 "value": (6, 6),
                 "rect": None,
                 "color": (255, 85, 85),
-            },  # Vermelho
+            },
         ]
 
         self.current_buttons = self.theme_buttons
+
+        # Áreas clicáveis do rodapé
         self.ranking_btn_rect = None
-        self.back_btn_rect = None  # Botão voltar genérico
+        self.stats_btn_rect = None
+        self.back_btn_rect = None
 
     def draw(self, screen):
         screen.fill(COLORS["background"])
@@ -66,18 +69,19 @@ class MenuUI:
         # Renderização condicional
         if self.state == "THEME_SELECT":
             self._draw_grid_menu(screen, width)
-            self._draw_footer_buttons(screen, width, height, show_ranking=True)
+            # CORREÇÃO AQUI: show_main_actions=True
+            self._draw_footer_buttons(screen, width, height, show_main_actions=True)
         else:
             self._draw_list_menu(screen, width)
+            # CORREÇÃO AQUI: show_main_actions=False
             self._draw_footer_buttons(
-                screen, width, height, show_ranking=False, show_back=True
+                screen, width, height, show_main_actions=False, show_back=True
             )
 
     def _draw_grid_menu(self, screen, width):
         cols = 3
         tile_size = 140
         gap = 20
-
         total_w = (cols * tile_size) + ((cols - 1) * gap)
         start_x = (width - total_w) // 2
         start_y = 180
@@ -109,13 +113,14 @@ class MenuUI:
                 screen, COLORS["accent"], btn_rect, width=2, border_radius=15
             )
 
-            # Ícone e Texto
+            # Ícone
             icon_surf = self.font_icon.render(btn["icon"], True, COLORS["text"])
             screen.blit(
                 icon_surf,
                 icon_surf.get_rect(center=(btn_rect.centerx, btn_rect.centery - 15)),
             )
 
+            # Texto
             text_surf = self.font_btn.render(btn["text"], True, COLORS["accent"])
             screen.blit(
                 text_surf,
@@ -123,7 +128,6 @@ class MenuUI:
             )
 
     def _draw_list_menu(self, screen, width):
-        # Design vertical limpo para dificuldade
         start_y = 180
         btn_w, btn_h = 350, 80
         gap = 25
@@ -138,30 +142,24 @@ class MenuUI:
             if is_hover:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
 
-            # Cor baseada na dificuldade (Verde/Laranja/Vermelho)
             base_color = btn.get("color", COLORS["card_back"])
             draw_color = (
                 base_color if not is_hover else [min(c + 30, 255) for c in base_color]
             )
 
-            # Desenho
             pygame.draw.rect(screen, draw_color, btn_rect, border_radius=12)
             pygame.draw.rect(
                 screen, COLORS["text"], btn_rect, width=2, border_radius=12
             )
 
-            # Texto Principal (Esquerda)
-            txt_surf = self.font_title.render(
-                btn["text"], True, (40, 40, 40)
-            )  # Texto escuro
-            # Reduz um pouco o tamanho
+            # Texto
+            txt_surf = self.font_title.render(btn["text"], True, (40, 40, 40))
             txt_surf = pygame.transform.rotozoom(txt_surf, 0, 0.7)
             screen.blit(
                 txt_surf,
                 (btn_rect.x + 30, btn_rect.centery - txt_surf.get_height() // 2),
             )
 
-            # Subtexto (Direita)
             sub_surf = self.font_sub.render(btn["sub"], True, (60, 60, 60))
             screen.blit(
                 sub_surf,
@@ -172,27 +170,23 @@ class MenuUI:
             )
 
     def _draw_footer_buttons(
-        self, screen, width, height, show_ranking=False, show_back=False
+        self, screen, width, height, show_main_actions=False, show_back=False
     ):
         mouse_pos = pygame.mouse.get_pos()
 
-        if show_ranking:
-            btn_rect = pygame.Rect(0, 0, 200, 50)
-            btn_rect.center = (width // 2, height - 80)
-            self.ranking_btn_rect = btn_rect
+        if show_main_actions:
+            # Botão Ranking (Esquerda)
+            r_rect = pygame.Rect(width // 2 - 160, height - 70, 150, 45)
+            self.ranking_btn_rect = r_rect
+            self._draw_btn(screen, r_rect, "🏆 Ranking", mouse_pos)
 
-            is_hover = btn_rect.collidepoint(mouse_pos)
-            color = COLORS["card_back_hover"] if is_hover else COLORS["card_back"]
-
-            pygame.draw.rect(screen, color, btn_rect, border_radius=10)
-            pygame.draw.rect(
-                screen, COLORS["accent"], btn_rect, width=2, border_radius=10
-            )
-
-            lbl = self.font_btn.render("🏆 Ver Ranking", True, COLORS["accent"])
-            screen.blit(lbl, lbl.get_rect(center=btn_rect.center))
+            # Botão Estatísticas (Direita)
+            s_rect = pygame.Rect(width // 2 + 10, height - 70, 150, 45)
+            self.stats_btn_rect = s_rect
+            self._draw_btn(screen, s_rect, "📊 Estatísticas", mouse_pos)
         else:
             self.ranking_btn_rect = None
+            self.stats_btn_rect = None
 
         if show_back:
             btn_rect = pygame.Rect(40, height - 70, 120, 40)
@@ -207,17 +201,30 @@ class MenuUI:
         else:
             self.back_btn_rect = None
 
+    def _draw_btn(self, screen, rect, text, mouse_pos):
+        is_hover = rect.collidepoint(mouse_pos)
+        color = COLORS["card_back_hover"] if is_hover else COLORS["card_back"]
+        if is_hover:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+
+        pygame.draw.rect(screen, color, rect, border_radius=10)
+        pygame.draw.rect(screen, COLORS["accent"], rect, width=2, border_radius=10)
+        lbl = self.font_btn.render(text, True, COLORS["accent"])
+        screen.blit(lbl, lbl.get_rect(center=rect.center))
+
     def handle_click(self, pos):
-        # 1. Checa botões da lista principal
+        # 1. Checa botões da lista principal (Temas ou Dificuldade)
         for btn in self.current_buttons:
             if btn["rect"] and btn["rect"].collidepoint(pos):
                 return (self.state, btn["value"])
 
-        # 2. Checa Ranking
+        # 2. Checa Botões de Ação do Rodapé
         if self.ranking_btn_rect and self.ranking_btn_rect.collidepoint(pos):
             return ("ACTION", "RANKING")
 
-        # 3. Checa Voltar
+        if self.stats_btn_rect and self.stats_btn_rect.collidepoint(pos):
+            return ("ACTION", "STATS")
+
         if self.back_btn_rect and self.back_btn_rect.collidepoint(pos):
             return ("ACTION", "BACK")
 
@@ -231,4 +238,11 @@ class MenuUI:
         self.state = "THEME_SELECT"
         self.current_buttons = self.theme_buttons
         self.ranking_btn_rect = None
+        self.stats_btn_rect = None
         self.back_btn_rect = None
+
+    def check_ranking_click(self, pos):
+        # Wrapper de compatibilidade, mas o ideal é usar o handle_click direto
+        if self.state == "THEME_SELECT" and self.ranking_btn_rect:
+            return self.ranking_btn_rect.collidepoint(pos)
+        return False

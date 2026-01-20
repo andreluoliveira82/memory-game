@@ -11,7 +11,8 @@ from src.ui.components import InputBox
 from src.ui.gui import GraphicUI
 from src.ui.menu import MenuUI
 from src.ui.ranking import RankingUI
-from src.ui.styles import COLORS, DIMENSIONS
+from src.ui.statistics import StatisticsUI
+from src.ui.styles import DIMENSIONS, THEMES
 
 
 class GameManager:
@@ -19,7 +20,6 @@ class GameManager:
         os.environ["SDL_VIDEO_CENTERED"] = "1"
         pygame.init()
 
-        # Tamanho padrão para o Menu
         self.menu_size = (900, 750)
         self.screen = pygame.display.set_mode(self.menu_size)
         pygame.display.set_caption("Memória Pythônica V3")
@@ -30,6 +30,8 @@ class GameManager:
 
         self.menu = MenuUI()
         self.ranking_ui = RankingUI(self.repository)
+        self.stats_ui = StatisticsUI(self.repository)  # INICIALIZAÇÃO
+
         self.game_ui = None
         self.player_name = ""
 
@@ -37,19 +39,20 @@ class GameManager:
         self.input_box = InputBox(300, 350, 300, 60, self.font_login)
 
         self.selected_theme = None
+        self.current_theme = 'dracula'
+        
         self.selected_difficulty_label = ""
         self.current_difficulty = (4, 4)
 
+        
     def start_game(self, difficulty_tuple):
         rows, cols = difficulty_tuple
         self.current_difficulty = difficulty_tuple
 
-        # Ajuste dinâmico de tamanho
         current_card_size = DIMENSIONS["card_size"]
         if rows >= 6:
             current_card_size = 85
 
-        # Multiplicador
         multiplier = 1.0
         if rows == 4 and cols == 4:
             self.selected_difficulty_label = "Fácil"
@@ -61,7 +64,6 @@ class GameManager:
             self.selected_difficulty_label = "Difícil"
             multiplier = 2.0
 
-        # Estratégia
         if self.selected_theme == "Matemática":
             strategy = MathStrategy()
         elif self.selected_theme == "Química":
@@ -100,7 +102,6 @@ class GameManager:
     def run(self):
         running = True
         while running:
-            # Reseta cursor
             if self.state != "MENU":
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
@@ -126,6 +127,8 @@ class GameManager:
                             if type_action == "ACTION":
                                 if value == "RANKING":
                                     self.state = "RANKING"
+                                elif value == "STATS":  # NOVO: Vai para Estatísticas
+                                    self.state = "STATS"
                                 elif value == "BACK":
                                     self.menu.reset()
 
@@ -137,19 +140,24 @@ class GameManager:
 
                 # --- RANKING ---
                 elif self.state == "RANKING":
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            self.state = "MENU"
-
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                        self.state = "MENU"
                     if event.type == pygame.MOUSEBUTTONDOWN:
                         if self.ranking_ui.handle_click(event) == "BACK":
                             self.state = "MENU"
 
+                # --- STATS (DASHBOARD) ---
+                elif self.state == "STATS":
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                        self.state = "MENU"
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        if self.stats_ui.handle_click(event) == "BACK":
+                            self.state = "MENU"
+
                 # --- GAME ---
                 elif self.state == "GAME":
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            self.return_to_menu()
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                        self.return_to_menu()
 
                     action = self.game_ui.handle_click(event)
 
@@ -157,11 +165,8 @@ class GameManager:
                         self.return_to_menu()
                     elif action == "RESTART":
                         self.start_game(self.current_difficulty)
-                    elif action == "RANKING":  # <--- NOVA AÇÃO TRATADA
-                        # Vai para o ranking, mas primeiro ajusta o tamanho da tela
-                        # para o padrão do menu, senão o ranking fica estranho
-                        os.environ["SDL_VIDEO_CENTERED"] = "1"
-                        self.screen = pygame.display.set_mode(self.menu_size)
+                    elif action == "RANKING":
+                        self.return_to_menu()
                         self.state = "RANKING"
 
                     if (
@@ -177,6 +182,7 @@ class GameManager:
                         self.game_ui.saved = True
 
             # --- DESENHO ---
+            COLORS = THEMES[self.current_theme]
             self.screen.fill(COLORS["background"])
 
             if self.state == "LOGIN":
@@ -185,6 +191,8 @@ class GameManager:
                 self.menu.draw(self.screen)
             elif self.state == "RANKING":
                 self.ranking_ui.draw(self.screen)
+            elif self.state == "STATS":
+                self.stats_ui.draw(self.screen)  # DESENHA STATS
             elif self.state == "GAME":
                 self.game_ui.update()
                 self.game_ui.draw()
@@ -194,6 +202,7 @@ class GameManager:
         pygame.quit()
 
     def _draw_login(self):
+        COLORS = THEMES[self.current_theme]
         title = self.font_login.render("Digite seu Nome:", True, COLORS["text"])
         title_rect = title.get_rect(center=(450, 280))
         self.screen.blit(title, title_rect)
