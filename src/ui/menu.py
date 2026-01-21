@@ -8,7 +8,7 @@ Permite seleção de tema, dificuldade e acesso a outras telas
 
 import pygame
 
-from src.ui.styles import COLORS
+import src.ui.styles as styles
 
 
 class MenuUI:
@@ -23,7 +23,7 @@ class MenuUI:
         """Inicializa o menu."""
         self.font_title = pygame.font.SysFont("segoeui", 60, bold=True)
         self.font_icon = pygame.font.SysFont("segoeuiemoji", 60)
-        self.font_btn = pygame.font.SysFont("segoeui", 20, bold=True)
+        self.font_btn = pygame.font.SysFont("segoeui", 18, bold=True)
         self.font_sub = pygame.font.SysFont("segoeui", 18)
 
         self.state = "THEME_SELECT"
@@ -67,7 +67,7 @@ class MenuUI:
         # Áreas clicáveis do rodapé
         self.ranking_btn_rect = None
         self.stats_btn_rect = None
-        self.settings_btn_rect = None  # NOVO
+        self.settings_btn_rect = None
         self.back_btn_rect = None
 
     def draw(self, screen: pygame.Surface) -> None:
@@ -77,14 +77,14 @@ class MenuUI:
         Args:
             screen: Superfície do Pygame
         """
-        screen.fill(COLORS["background"])
+        screen.fill(styles.COLORS["background"])
         width, height = screen.get_width(), screen.get_height()
 
         # Título
         title_text = (
             "Escolha o Tema" if self.state == "THEME_SELECT" else "Nível de Dificuldade"
         )
-        title_surf = self.font_title.render(title_text, True, COLORS["accent"])
+        title_surf = self.font_title.render(title_text, True, styles.COLORS["accent"])
         title_rect = title_surf.get_rect(center=(width // 2, 80))
         screen.blit(title_surf, title_rect)
 
@@ -99,13 +99,7 @@ class MenuUI:
             )
 
     def _draw_grid_menu(self, screen: pygame.Surface, width: int) -> None:
-        """
-        Desenha menu em grade (para temas).
-
-        Args:
-            screen: Superfície do Pygame
-            width: Largura da tela
-        """
+        """Desenha menu em grade (para temas)."""
         cols = 3
         tile_size = 140
         gap = 20
@@ -128,40 +122,34 @@ class MenuUI:
             if is_hover:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
 
-            # Sombra
             shadow = btn_rect.copy()
             shadow.move_ip(4, 4)
             pygame.draw.rect(screen, (30, 30, 30), shadow, border_radius=15)
 
-            # Fundo
-            bg_color = COLORS["card_back_hover"] if is_hover else COLORS["card_back"]
+            bg_color = (
+                styles.COLORS["card_back_hover"]
+                if is_hover
+                else styles.COLORS["card_back"]
+            )
             pygame.draw.rect(screen, bg_color, btn_rect, border_radius=15)
             pygame.draw.rect(
-                screen, COLORS["accent"], btn_rect, width=2, border_radius=15
+                screen, styles.COLORS["accent"], btn_rect, width=2, border_radius=15
             )
 
-            # Ícone
-            icon_surf = self.font_icon.render(btn["icon"], True, COLORS["text"])
+            icon_surf = self.font_icon.render(btn["icon"], True, styles.COLORS["text"])
             screen.blit(
                 icon_surf,
                 icon_surf.get_rect(center=(btn_rect.centerx, btn_rect.centery - 15)),
             )
 
-            # Texto
-            text_surf = self.font_btn.render(btn["text"], True, COLORS["accent"])
+            text_surf = self.font_btn.render(btn["text"], True, styles.COLORS["accent"])
             screen.blit(
                 text_surf,
                 text_surf.get_rect(center=(btn_rect.centerx, btn_rect.centery + 35)),
             )
 
     def _draw_list_menu(self, screen: pygame.Surface, width: int) -> None:
-        """
-        Desenha menu em lista (para dificuldades).
-
-        Args:
-            screen: Superfície do Pygame
-            width: Largura da tela
-        """
+        """Desenha menu em lista (para dificuldades)."""
         start_y = 180
         btn_w, btn_h = 350, 80
         gap = 25
@@ -176,17 +164,16 @@ class MenuUI:
             if is_hover:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
 
-            base_color = btn.get("color", COLORS["card_back"])
+            base_color = btn.get("color", styles.COLORS["card_back"])
             draw_color = (
                 base_color if not is_hover else [min(c + 30, 255) for c in base_color]
             )
 
             pygame.draw.rect(screen, draw_color, btn_rect, border_radius=12)
             pygame.draw.rect(
-                screen, COLORS["text"], btn_rect, width=2, border_radius=12
+                screen, styles.COLORS["text"], btn_rect, width=2, border_radius=12
             )
 
-            # Texto principal
             txt_surf = self.font_title.render(btn["text"], True, (40, 40, 40))
             txt_surf = pygame.transform.rotozoom(txt_surf, 0, 0.7)
             screen.blit(
@@ -194,7 +181,6 @@ class MenuUI:
                 (btn_rect.x + 30, btn_rect.centery - txt_surf.get_height() // 2),
             )
 
-            # Subtítulo
             sub_surf = self.font_sub.render(btn["sub"], True, (60, 60, 60))
             screen.blit(
                 sub_surf,
@@ -212,40 +198,27 @@ class MenuUI:
         show_main_actions: bool = False,
         show_back: bool = False,
     ) -> None:
-        """
-        Desenha botões do rodapé (ranking, stats, settings).
-
-        Args:
-            screen: Superfície do Pygame
-            width: Largura da tela
-            height: Altura da tela
-            show_main_actions: Se True, mostra botões principais
-            show_back: Se True, mostra botão voltar
-        """
+        """Desenha botões do rodapé."""
         mouse_pos = pygame.mouse.get_pos()
 
         if show_main_actions:
-            # Três botões: Ranking, Estatísticas, Configurações
-            btn_w = 140
-            gap = 10
+            btn_w = 130
+            gap = 12
             total_w = 3 * btn_w + 2 * gap
             start_x = (width - total_w) // 2
             y = height - 70
 
-            # Ranking
             r_rect = pygame.Rect(start_x, y, btn_w, 45)
             self.ranking_btn_rect = r_rect
-            self._draw_footer_btn(screen, r_rect, "🏆 Ranking", mouse_pos)
+            self._draw_footer_btn(screen, r_rect, "Ranking", mouse_pos, "🏆")
 
-            # Estatísticas
             s_rect = pygame.Rect(start_x + btn_w + gap, y, btn_w, 45)
             self.stats_btn_rect = s_rect
-            self._draw_footer_btn(screen, s_rect, "📊 Stats", mouse_pos)
+            self._draw_footer_btn(screen, s_rect, "Stats", mouse_pos, "📊")
 
-            # Configurações (NOVO)
             cfg_rect = pygame.Rect(start_x + 2 * (btn_w + gap), y, btn_w, 45)
             self.settings_btn_rect = cfg_rect
-            self._draw_footer_btn(screen, cfg_rect, "⚙️ Config", mouse_pos)
+            self._draw_footer_btn(screen, cfg_rect, "Config", mouse_pos, "⚙️")
         else:
             self.ranking_btn_rect = None
             self.stats_btn_rect = None
@@ -257,51 +230,46 @@ class MenuUI:
 
             is_hover = btn_rect.collidepoint(mouse_pos)
             color = (60, 60, 60) if not is_hover else (80, 80, 80)
+            if is_hover:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
 
             pygame.draw.rect(screen, color, btn_rect, border_radius=8)
-            lbl = self.font_btn.render("← Voltar", True, COLORS["text"])
+            lbl = self.font_btn.render("← Voltar", True, styles.COLORS["text"])
             screen.blit(lbl, lbl.get_rect(center=btn_rect.center))
         else:
             self.back_btn_rect = None
 
     def _draw_footer_btn(
-        self, screen: pygame.Surface, rect: pygame.Rect, text: str, mouse_pos: tuple
+        self,
+        screen: pygame.Surface,
+        rect: pygame.Rect,
+        text: str,
+        mouse_pos: tuple,
+        emoji: str = "",
     ) -> None:
-        """
-        Desenha um botão do rodapé.
-
-        Args:
-            screen: Superfície do Pygame
-            rect: Retângulo do botão
-            text: Texto a exibir
-            mouse_pos: Posição do mouse
-        """
+        """Desenha um botão do rodapé."""
         is_hover = rect.collidepoint(mouse_pos)
-        color = COLORS["card_back_hover"] if is_hover else COLORS["card_back"]
+        color = (
+            styles.COLORS["card_back_hover"] if is_hover else styles.COLORS["card_back"]
+        )
         if is_hover:
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
 
         pygame.draw.rect(screen, color, rect, border_radius=10)
-        pygame.draw.rect(screen, COLORS["accent"], rect, width=2, border_radius=10)
-        lbl = self.font_btn.render(text, True, COLORS["accent"])
+        pygame.draw.rect(
+            screen, styles.COLORS["accent"], rect, width=2, border_radius=10
+        )
+
+        # Renderiza apenas texto (sem emoji problemático)
+        lbl = self.font_btn.render(text, True, styles.COLORS["accent"])
         screen.blit(lbl, lbl.get_rect(center=rect.center))
 
     def handle_click(self, pos: tuple) -> tuple | None:
-        """
-        Processa clique no menu.
-
-        Args:
-            pos: Posição do clique (x, y)
-
-        Returns:
-            Tupla (tipo, valor) ou None
-        """
-        # Checa botões da lista principal
+        """Processa clique no menu."""
         for btn in self.current_buttons:
             if btn["rect"] and btn["rect"].collidepoint(pos):
                 return (self.state, btn["value"])
 
-        # Checa botões de ação do rodapé
         if self.ranking_btn_rect and self.ranking_btn_rect.collidepoint(pos):
             return ("ACTION", "RANKING")
 

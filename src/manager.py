@@ -10,6 +10,7 @@ import os
 
 import pygame
 
+import src.ui.styles as styles  # Import do módulo inteiro
 from src.domain.board import Board
 from src.domain.strategies import ChemistryStrategy, EmojiStrategy, MathStrategy
 from src.infrastructure.repository import ScoreRepository
@@ -20,7 +21,7 @@ from src.ui.menu import MenuUI
 from src.ui.ranking import RankingUI
 from src.ui.settings import SettingsUI
 from src.ui.statistics import StatisticsUI
-from src.ui.styles import COLORS, DIMENSIONS
+from src.ui.styles import DIMENSIONS
 
 
 class GameManager:
@@ -109,6 +110,9 @@ class GameManager:
             self.screen = pygame.display.set_mode((final_w, final_h))
             self.game_ui = GraphicUI(service, card_size=current_card_size)
             self.game_ui.screen = self.screen
+            self.game_ui.set_theme(
+                self.selected_theme
+            )  # Define o tema para buscar fatos
             self.state = "GAME"
 
         except ValueError as e:
@@ -188,8 +192,8 @@ class GameManager:
                         if action == "BACK":
                             self.state = "MENU"
                         elif action == "THEME_CHANGED":
-                            # Atualiza tema em todas as telas
-                            self._refresh_all_screens()
+                            # Força recriação das telas para aplicar novo tema
+                            self._recreate_ui_screens()
 
                 # --- GAME ---
                 elif self.state == "GAME":
@@ -199,8 +203,10 @@ class GameManager:
                     action = self.game_ui.handle_click(event)
 
                     if action == "MENU":
+                        self.game_ui.reset_animations()  # Limpa antes de sair
                         self.return_to_menu()
                     elif action == "RESTART":
+                        self.game_ui.reset_animations()  # Limpa antes de reiniciar
                         self.start_game(self.current_difficulty)
                     elif action == "RANKING":
                         self.return_to_menu()
@@ -219,7 +225,7 @@ class GameManager:
                         self.game_ui.saved = True
 
             # --- DESENHO ---
-            self.screen.fill(COLORS["background"])
+            self.screen.fill(styles.COLORS["background"])
 
             if self.state == "LOGIN":
                 self._draw_login()
@@ -242,22 +248,26 @@ class GameManager:
 
     def _draw_login(self) -> None:
         """Renderiza a tela de login."""
-        title = self.font_login.render("Digite seu Nome:", True, COLORS["text"])
+        title = self.font_login.render("Digite seu Nome:", True, styles.COLORS["text"])
         title_rect = title.get_rect(center=(450, 280))
         self.screen.blit(title, title_rect)
         self.input_box.draw(self.screen)
         hint = pygame.font.SysFont("arial", 20).render(
-            "ENTER para confirmar", True, COLORS["accent"]
+            "ENTER para confirmar", True, styles.COLORS["accent"]
         )
         self.screen.blit(hint, (360, 420))
 
-    def _refresh_all_screens(self) -> None:
+    def _recreate_ui_screens(self) -> None:
         """
-        Atualiza cores em todas as telas após mudança de tema.
+        Recria todas as telas da UI após mudança de tema.
 
-        Este método força a recriação de elementos visuais que
-        dependem das cores do tema.
+        Isso garante que as cores sejam atualizadas imediatamente.
         """
-        # As telas já usam COLORS globalmente, então apenas redesenham
-        # Mas podemos adicionar lógica específica se necessário no futuro
-        pass
+        # Recria todas as instâncias das telas
+        self.menu = MenuUI()
+        self.ranking_ui = RankingUI(self.repository)
+        self.stats_ui = StatisticsUI(self.repository)
+        # settings_ui não precisa recriar pois está na tela ativa
+
+        # Recria input box com novo tema
+        self.input_box = InputBox(300, 350, 300, 60, self.font_login)

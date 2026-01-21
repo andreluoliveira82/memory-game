@@ -266,6 +266,7 @@ class AdvancedParticleSystem:
     def __init__(self):
         """Inicializa o sistema de partículas."""
         self.particles: list[Particle] = []
+        self.max_particles = 300  # Limite para evitar lag
 
     def emit(
         self,
@@ -409,11 +410,16 @@ class AdvancedParticleSystem:
         Args:
             screen: Superfície do Pygame para desenho
         """
-        for particle in self.particles[:]:
-            if not particle.update():
-                self.particles.remove(particle)
-            else:
-                particle.draw(screen)
+        # Remove partículas mortas primeiro (otimização)
+        self.particles = [p for p in self.particles if p.update()]
+
+        # Limita quantidade máxima para evitar lag
+        if len(self.particles) > self.max_particles:
+            self.particles = self.particles[-self.max_particles :]
+
+        # Renderiza apenas partículas vivas
+        for particle in self.particles:
+            particle.draw(screen)
 
     def clear(self) -> None:
         """Remove todas as partículas ativas."""
@@ -486,7 +492,9 @@ class CardFlipAnimation:
     Simula rotação 3D usando escala 2D para criar efeito de virada.
     """
 
-    def __init__(self, card_rect: pygame.Rect, duration: int = 300):
+    def __init__(
+        self, card_rect: pygame.Rect, duration: int = 200
+    ):  # Reduzido de 300 para 200ms
         """
         Inicializa a animação.
 

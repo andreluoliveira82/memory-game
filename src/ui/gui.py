@@ -8,6 +8,8 @@ do jogador durante uma partida.
 
 import pygame
 
+import src.ui.styles as styles
+from src.domain.facts import FactsDatabase
 from src.infrastructure.sound import SoundManager
 from src.services.game_service import GameService
 from src.ui.components import (
@@ -15,7 +17,8 @@ from src.ui.components import (
     Button,
     CardFlipAnimation,
 )
-from src.ui.styles import COLORS, DIMENSIONS
+from src.ui.flashcard import FlashcardManager
+from src.ui.styles import DIMENSIONS
 
 
 class GraphicUI:
@@ -53,7 +56,11 @@ class GraphicUI:
 
         # Sistemas Visuais Avançados
         self.particles = AdvancedParticleSystem()
+        self.flashcards = FlashcardManager()
         self.flip_animations: dict[tuple, CardFlipAnimation] = {}
+
+        # Armazena tema atual para buscar fatos
+        self.current_theme = None
 
         self.stars_earned = 0
         self.animation_triggered = False
@@ -79,7 +86,6 @@ class GraphicUI:
             self.font_emoji = pygame.font.SysFont("segoeuiemoji", 60)
             self.font_score_big = pygame.font.SysFont("segoeui", 55, bold=True)
         except:
-            # Fallback para Arial caso Segoe UI não esteja disponível
             self.font_base_name = "arial"
             self.font_title = pygame.font.SysFont("arial", 40, bold=True)
             self.font_stats = pygame.font.SysFont("arial", 20)
@@ -97,7 +103,7 @@ class GraphicUI:
             h=50,
             text="Jogar Novamente",
             font=self.font_btn,
-            color=COLORS["success"],
+            color=styles.COLORS["success"],
             hover_color=(100, 255, 150),
             text_color=(40, 40, 40),
         )
@@ -109,9 +115,9 @@ class GraphicUI:
             h=45,
             text="Menu",
             font=self.font_btn,
-            color=COLORS["card_back"],
-            hover_color=COLORS["accent"],
-            text_color=COLORS["text"],
+            color=styles.COLORS["card_back"],
+            hover_color=styles.COLORS["accent"],
+            text_color=styles.COLORS["text"],
         )
 
         self.btn_ranking = Button(
@@ -121,9 +127,9 @@ class GraphicUI:
             h=45,
             text="Ranking",
             font=self.font_btn,
-            color=COLORS["card_back"],
-            hover_color=COLORS["accent"],
-            text_color=COLORS["text"],
+            color=styles.COLORS["card_back"],
+            hover_color=styles.COLORS["accent"],
+            text_color=styles.COLORS["text"],
         )
 
     def _calculate_stars(self) -> int:
@@ -137,19 +143,23 @@ class GraphicUI:
         moves = self.service.moves
 
         if moves <= pairs * 1.5:
-            return 3  # Perfeito ou quase
+            return 3
         elif moves <= pairs * 2.5:
-            return 2  # Bom
-        return 1  # Completou, mas com erros
+            return 2
+        return 1
 
     def update(self) -> None:
         """Atualiza estado das animações e timers."""
-        # Atualiza animações de flip
-        for key in list(self.flip_animations.keys()):
-            if not self.flip_animations[key].update():
-                del self.flip_animations[key]
+        # Limpa animações completadas
+        completed_anims = [
+            key for key, anim in self.flip_animations.items() if not anim.update()
+        ]
+        for key in completed_anims:
+            del self.flip_animations[key]
 
-        # Timer para esconder cartas erradas
+        # Atualiza flashcards
+        self.flashcards.update()
+
         if self.waiting_to_hide:
             if pygame.time.get_ticks() - self.hide_timestamp > 1000:
                 self.service.hide_cards(*self.cards_to_hide)
@@ -167,7 +177,6 @@ class GraphicUI:
         Returns:
             Ação a ser executada ("RESTART", "MENU", "RANKING") ou None
         """
-        # Se o jogo acabou, processa cliques nos botões da overlay
         if self.service.board.all_matched:
             if self.btn_restart.check_click(event):
                 self.sounds.play("click")
@@ -180,7 +189,6 @@ class GraphicUI:
                 return "RANKING"
             return None
 
-        # Jogo em andamento
         if self.waiting_to_hide:
             return None
 
@@ -192,6 +200,23 @@ class GraphicUI:
                         self._process_pick(r, c)
                         break
         return None
+
+    def set_theme(self, theme_name: str) -> None:
+        """
+        Define o tema atual do jogo (para buscar fatos).
+
+        Args:
+            theme_name: Nome do tema (ex: "Química", "Animais")
+        """
+        self.current_theme = theme_name
+
+    def reset_animations(self) -> None:
+        """Limpa todas as animações e efeitos visuais."""
+        self.particles.clear()
+        self.flashcards.clear()
+        self.flip_animations.clear()
+        self.animation_triggered = False
+        print("🧹 Animações limpas!")  # Debug
 
     def _process_pick(self, r: int, c: int) -> None:
         """
@@ -205,7 +230,6 @@ class GraphicUI:
         current_pos = (r, c)
         result = self.service.pick_card(r, c)
 
-        # Inicia animação de flip
         card_rect = self._get_card_rect(r, c)
         self.flip_animations[current_pos] = CardFlipAnimation(card_rect)
 
@@ -213,7 +237,22 @@ class GraphicUI:
             self.sounds.play("match")
             combo = self.service.combo_streak
 
-            # Efeitos visuais baseados no combo
+            # Busca fato educacional
+            card = self.service.board.get_card(r, c)
+            if card and self.current_theme:
+                fact = FactsDatabase.get_fact(self.current_theme, card.match_id)
+                if fact:
+                    # Exibe flashcard no centro da tela
+                    flashcard_pos = (self.width // 2, self.height // 2 + 100)
+                    self.flashcards.add_flashcard(fact, flashcard_pos)
+                    print(
+                        f"✅ Flashcard exibido: {fact.get('name', card.match_id)}"
+                    )  # Debug
+                else:
+                    print(
+                        f"⚠️ Nenhum fato encontrado para: {self.current_theme} / {card.match_id}"
+                    )  # Debug
+
             if combo == 1:
                 self.particles.sparkle(card_rect.centerx, card_rect.centery)
                 self.message = "Boa! Um par!"
@@ -224,11 +263,9 @@ class GraphicUI:
                 self.particles.sparkle(card_rect.centerx, card_rect.centery)
                 self.message = f"COMBO x{combo}! (+{100 * combo})"
 
-            # Vitória
             if self.service.board.all_matched:
                 self.sounds.play("win")
 
-                # Efeito especial baseado na performance
                 stars = self._calculate_stars()
                 if stars == 3:
                     self.particles.rainbow_burst(self.width // 2, self.height // 2)
@@ -248,16 +285,13 @@ class GraphicUI:
 
     def draw(self) -> None:
         """Renderiza toda a interface do jogo."""
-        self.screen.fill(COLORS["background"])
+        self.screen.fill(styles.COLORS["background"])
 
-        # Título
-        title = self.font_title.render("Memory Game", True, COLORS["accent"])
+        title = self.font_title.render("Memory Game", True, styles.COLORS["accent"])
         self.screen.blit(title, title.get_rect(center=(self.width // 2, 40)))
 
-        # Estatísticas
         self._draw_stats()
 
-        # Tabuleiro de cartas
         mouse_pos = pygame.mouse.get_pos()
         for r in range(self.service.board.rows):
             for c in range(self.service.board.cols):
@@ -265,18 +299,17 @@ class GraphicUI:
                 rect = self._get_card_rect(r, c)
                 self._draw_single_card(card, rect, mouse_pos, (r, c))
 
-        # Mensagem de feedback
         if not self.service.board.all_matched:
-            msg_surf = self.font_msg.render(self.message, True, COLORS["accent"])
+            msg_surf = self.font_msg.render(self.message, True, styles.COLORS["accent"])
             msg_rect = msg_surf.get_rect(center=(self.width // 2, self.height - 50))
             self.screen.blit(msg_surf, msg_rect)
 
-        # Overlay de Game Over
         if self.service.board.all_matched:
             self._draw_game_over_overlay()
 
-        # Partículas (sempre por cima)
+        # Partículas e Flashcards (sempre por cima)
         self.particles.update_and_draw(self.screen)
+        self.flashcards.draw(self.screen)
 
     def _draw_game_over_overlay(self) -> None:
         """Renderiza a tela de Game Over com resultados e botões."""
@@ -284,29 +317,24 @@ class GraphicUI:
             self.stars_earned = self._calculate_stars()
             self.animation_triggered = True
 
-        # Fundo semi-transparente
         overlay = pygame.Surface((self.width, self.height))
         overlay.set_alpha(210)
         overlay.fill((15, 15, 20))
         self.screen.blit(overlay, (0, 0))
 
-        # Painel central
         card_w, card_h = 480, 460
         cx, cy = self.width // 2, self.height // 2
         card_rect = pygame.Rect(0, 0, card_w, card_h)
         card_rect.center = (cx, cy)
 
-        # Desenho do painel
         pygame.draw.rect(self.screen, (50, 52, 64), card_rect, border_radius=20)
         pygame.draw.rect(
-            self.screen, COLORS["accent"], card_rect, width=2, border_radius=20
+            self.screen, styles.COLORS["accent"], card_rect, width=2, border_radius=20
         )
 
-        # Título
-        lbl = self.font_title.render("NÍVEL CONCLUÍDO!", True, COLORS["success"])
+        lbl = self.font_title.render("NÍVEL CONCLUÍDO!", True, styles.COLORS["success"])
         self.screen.blit(lbl, lbl.get_rect(center=(cx, cy - 170)))
 
-        # Estrelas
         star_str = "⭐" * self.stars_earned
         base_stars = self.font_emoji.render("⭐" * 3, True, (80, 80, 90))
         gold_stars = self.font_emoji.render(star_str, True, (255, 215, 0))
@@ -316,21 +344,18 @@ class GraphicUI:
         if self.stars_earned > 0:
             self.screen.blit(gold_stars, gold_stars.get_rect(center=(cx, stars_y)))
 
-        # Pontuação
         score_lbl = self.font_stats.render("PONTUAÇÃO FINAL", True, (180, 180, 180))
         score_val = self.font_score_big.render(
-            str(self.service.score), True, COLORS["text"]
+            str(self.service.score), True, styles.COLORS["text"]
         )
 
         self.screen.blit(score_lbl, score_lbl.get_rect(center=(cx, cy - 40)))
         self.screen.blit(score_val, score_val.get_rect(center=(cx, cy + 10)))
 
-        # Tempo
         time_str = f"Tempo: {self.service.get_time_formatted()}"
-        time_surf = self.font_msg.render(time_str, True, COLORS["accent"])
+        time_surf = self.font_msg.render(time_str, True, styles.COLORS["accent"])
         self.screen.blit(time_surf, time_surf.get_rect(center=(cx, cy + 60)))
 
-        # Botões
         self.btn_restart.rect.center = (cx, cy + 130)
         self.btn_restart.draw(self.screen)
 
@@ -361,7 +386,9 @@ class GraphicUI:
 
         score_text = f"Pontos: {self.service.score}"
         score_color = (
-            COLORS["success"] if self.service.combo_streak > 1 else COLORS["text"]
+            styles.COLORS["success"]
+            if self.service.combo_streak > 1
+            else styles.COLORS["text"]
         )
         self._draw_stat_box(
             score_text, (section_w * 1 + section_w // 2, y_pos), score_color
@@ -371,30 +398,14 @@ class GraphicUI:
         self._draw_stat_box(time_text, (section_w * 2 + section_w // 2, y_pos))
 
     def _draw_stat_box(self, text: str, pos: tuple, color: tuple = None) -> None:
-        """
-        Renderiza uma caixa de estatística individual.
-
-        Args:
-            text: Texto a exibir
-            pos: Posição (x, y)
-            color: Cor do texto (padrão: tema)
-        """
+        """Renderiza uma caixa de estatística individual."""
         if color is None:
-            color = COLORS["text"]
+            color = styles.COLORS["text"]
         surf = self.font_stats.render(text, True, color)
         self.screen.blit(surf, surf.get_rect(center=pos))
 
     def _get_card_rect(self, row: int, col: int) -> pygame.Rect:
-        """
-        Calcula o retângulo de uma carta no grid.
-
-        Args:
-            row: Linha da carta
-            col: Coluna da carta
-
-        Returns:
-            Retângulo com posição e tamanho da carta
-        """
+        """Calcula o retângulo de uma carta no grid."""
         start_x = (self.width - self.grid_width) // 2
         start_y = DIMENSIONS["header_height"]
         x = start_x + col * (self.card_size + DIMENSIONS["gap"])
@@ -404,47 +415,34 @@ class GraphicUI:
     def _draw_single_card(
         self, card, rect: pygame.Rect, mouse_pos: tuple, pos: tuple
     ) -> None:
-        """
-        Renderiza uma carta individual com animações.
-
-        Args:
-            card: Objeto Card
-            rect: Retângulo da carta
-            mouse_pos: Posição do mouse
-            pos: Tupla (row, col)
-        """
-        # Aplica animação de flip se existir
+        """Renderiza uma carta individual com animações."""
         if pos in self.flip_animations:
             anim = self.flip_animations[pos]
             rect = anim.rect
 
-        # Define cor de fundo
-        bg_color = COLORS["card_back"]
+        bg_color = styles.COLORS["card_back"]
         if not card.is_revealed and not card.is_matched and not self.waiting_to_hide:
             if rect.collidepoint(mouse_pos):
-                bg_color = COLORS["card_back_hover"]
+                bg_color = styles.COLORS["card_back_hover"]
         if card.is_revealed:
-            bg_color = COLORS["card_face"]
+            bg_color = styles.COLORS["card_face"]
         if card.is_matched:
-            bg_color = COLORS["success"]
+            bg_color = styles.COLORS["success"]
 
-        # Sombra
         shadow = rect.copy()
         shadow.move_ip(4, 4)
         pygame.draw.rect(
             self.screen, (20, 20, 20), shadow, border_radius=DIMENSIONS["border_radius"]
         )
 
-        # Carta
         pygame.draw.rect(
             self.screen, bg_color, rect, border_radius=DIMENSIONS["border_radius"]
         )
 
-        # Conteúdo
         if card.is_revealed or card.is_matched:
             pygame.draw.rect(
                 self.screen,
-                COLORS["card_border"],
+                styles.COLORS["card_border"],
                 rect,
                 width=2,
                 border_radius=DIMENSIONS["border_radius"],
@@ -455,19 +453,13 @@ class GraphicUI:
             self.screen.blit(q_surf, q_surf.get_rect(center=rect.center))
 
     def _draw_dynamic_text(self, text: str, rect: pygame.Rect) -> None:
-        """
-        Renderiza texto ajustando tamanho da fonte automaticamente.
-
-        Args:
-            text: Texto a exibir
-            rect: Retângulo onde o texto deve caber
-        """
+        """Renderiza texto ajustando tamanho da fonte automaticamente."""
         max_width = rect.width - 10
         font_size = 40
 
         while font_size > 12:
             font = pygame.font.SysFont(self.font_base_name, font_size)
-            text_surf = font.render(text, True, COLORS["text_card"])
+            text_surf = font.render(text, True, styles.COLORS["text_card"])
             if text_surf.get_width() <= max_width:
                 break
             font_size -= 2
